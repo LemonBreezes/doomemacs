@@ -254,7 +254,8 @@ orderless."
 (use-package! consult-yasnippet
   :when (modulep! :editor snippets)
   :defer t
-  :init (map! [remap yas-insert-snippet] #'consult-yasnippet))
+  :init (map! [remap yas-insert-snippet] #'consult-yasnippet
+              [remap yas-visit-snippet-file] #'consult-yasnippet-visit-snippet-file))
 
 
 (use-package! embark
