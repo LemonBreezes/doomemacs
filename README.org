@@ -1,0 +1,17 @@
+#+title: Doom Emacs (Cyber Angel Emacs fork)
+#+author: StrawberryTea
+#+date: 2023-10-13
+
+Hi. This is a fork of [[https://github.com/doomemacs/doomemacs][Doom Emacs]] that has the following PRs applied:
+- [[feat(corfu): update smart tab completion by LemonBreezes · Pull Request #7739 · doomemacs/doomemacs · GitHub]]
+
+These are just PRs that I am very excited to have in Doom Emacs and am currently
+testing so consider this an unstable branch of Doom Emacs. This list will be
+updated as I add or remove PRs from this config.
+
+Also, I use Emacs30 and have all my packages unpinned so if your PR is solely
+bumping a package or adding compatibility with an earlier version of Emacs, I
+will not merge it here.
+
+In this fork, I have also disabled ~doom upgrade~'s ability to upgrade Doom Emacs.
+To upgrade this Doom fork, you need to manually run ~git pull~.
