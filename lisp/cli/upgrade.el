@@ -21,6 +21,7 @@
 (defcli! ((upgrade up))
     ((packages?  ("-p" "--packages") "Only upgrade packages, not Doom")
      (jobs       ("-j" "--jobs" num) "How many CPUs to use for native compilation")
+     (nobuild?   ("-B") "Don't rebuild packages when hostname or Emacs version has changed")
      &context context)
   "Updates Doom and packages.
 
@@ -29,10 +30,11 @@ following shell commands:
 
     cd ~/.emacs.d
     git pull --rebase
-    doom clean
     doom sync -u"
   (let* ((force? (doom-cli-context-suppress-prompts-p context))
-         (sync-cmd (append '("sync" "-u" "-B") (if jobs `("-j" ,num)))))
+         (sync-cmd (append '("sync" "-u")
+                           (if nobuild? '("-B"))
+                           (if jobs `("-j" ,num)))))
     (cond
      (packages?
       ;; HACK It's messy to use straight to upgrade straight, due to the
@@ -53,7 +55,9 @@ following shell commands:
       ;; Reload Doom's CLI & libraries, in case there were any upstream changes.
       ;; Major changes will still break, however
       (print! (item "Reloading Doom Emacs"))
+      (doom-cli-context-put context 'upgrading t)
       (exit! "doom" "upgrade" "-p"
+             (if nobuild? "-B")
              (if force? "--force")
              (if jobs (format "--jobs=%d" jobs))))
 
@@ -96,54 +100,53 @@ following shell commands:
       ;;    (sh! "git" "clean" "-ffd")))
 
       (sh! "git" "remote" "remove" doom-upgrade-remote)
-      (unwind-protect
-          (let (result)
-            (or (zerop (car (sh! "git" "remote" "add" doom-upgrade-remote doom-upgrade-url)))
-                (error "Failed to add %s to remotes" doom-upgrade-remote))
-            (or (zerop (car (setq result (sh! "git" "fetch" "--force" "--tags" doom-upgrade-remote (format "%s:%s" branch target-remote)))))
-                (error "Failed to fetch from upstream"))
-
-            ;;(let ((this-rev (cdr (sh! "git" "rev-parse" "HEAD")))
-            ;;      (new-rev  (cdr (sh! "git" "rev-parse" target-remote))))
-            ;;  (cond
-            ;;   ((and (null this-rev)
-            ;;         (null new-rev))
-            ;;    (error "Failed to get revisions for %s" target-remote))
-            ;;
-            ;;   ((equal this-rev new-rev)
-            ;;    (print! (success "Doom is already up-to-date!"))
-            ;;    nil)
-            ;;
-            ;;   ((print! (item "A new version of Doom Emacs is available!\n\n  Old revision: %s (%s)\n  New revision: %s (%s)\n"
-            ;;                  (substring this-rev 0 10)
-            ;;                  (cdr (sh! "git" "log" "-1" "--format=%cr" "HEAD"))
-            ;;                  (substring new-rev 0 10)
-            ;;                  (cdr (sh! "git" "log" "-1" "--format=%cr" target-remote))))
-            ;;    (let ((diff-url
-            ;;           (format "%s/compare/%s...%s"
-            ;;                   doom-upgrade-url
-            ;;                   this-rev
-            ;;                   new-rev)))
-            ;;      (print! "Link to diff: %s" diff-url)
-            ;;      (when (and (not auto-accept-p)
-            ;;                 (y-or-n-p "View the comparison diff in your browser?"))
-            ;;        (print! (item "Opened github in your browser."))
-            ;;        (browse-url diff-url)))
-            ;;
-            ;;    (if (not (or auto-accept-p
-            ;;                 (y-or-n-p "Proceed with upgrade?")))
-            ;;        (ignore (print! (error "Aborted")))
-            ;;      (print! (start "Upgrading Doom Emacs..."))
-            ;;      (print-group!
-            ;;        (doom-compile-clean)
-            ;;        (doom-cli-context-put context 'straight-recipe (doom-upgrade--get-straight-recipe))
-            ;;        (or (and (zerop (car (sh! "git" "reset" "--hard" target-remote)))
-            ;;                 (equal (cdr (sh! "git" "rev-parse" "HEAD")) new-rev))
-            ;;            (error "Failed to check out %s" (substring new-rev 0 10))))))))
-            )
-        (ignore-errors
-          (sh! "git" "branch" "-D" target-remote)
-          (sh! "git" "remote" "remove" doom-upgrade-remote))))))
+      ;;(unwind-protect
+      ;;    (let (result)
+      ;;      (or (zerop (car (sh! "git" "remote" "add" doom-upgrade-remote doom-upgrade-url)))
+      ;;          (error "Failed to add %s to remotes" doom-upgrade-remote))
+      ;;      (or (zerop (car (setq result (sh! "git" "fetch" "--force" "--tags" doom-upgrade-remote (format "%s:%s" branch target-remote)))))
+      ;;          (error "Failed to fetch from upstream"))
+      ;;
+      ;;      (let ((this-rev (cdr (sh! "git" "rev-parse" "HEAD")))
+      ;;            (new-rev  (cdr (sh! "git" "rev-parse" target-remote))))
+      ;;        (cond
+      ;;         ((and (null this-rev)
+      ;;               (null new-rev))
+      ;;          (error "Failed to get revisions for %s" target-remote))
+      ;;
+      ;;         ((equal this-rev new-rev)
+      ;;          (print! (success "Doom is already up-to-date!"))
+      ;;          nil)
+      ;;
+      ;;         ((print! (item "A new version of Doom Emacs is available!\n\n  Old revision: %s (%s)\n  New revision: %s (%s)\n"
+      ;;                        (substring this-rev 0 10)
+      ;;                        (cdr (sh! "git" "log" "-1" "--format=%cr" "HEAD"))
+      ;;                        (substring new-rev 0 10)
+      ;;                        (cdr (sh! "git" "log" "-1" "--format=%cr" target-remote))))
+      ;;          (let ((diff-url
+      ;;                 (format "%s/compare/%s...%s"
+      ;;                         doom-upgrade-url
+      ;;                         this-rev
+      ;;                         new-rev)))
+      ;;            (print! "Link to diff: %s" diff-url)
+      ;;            (when (and (not auto-accept-p)
+      ;;                       (y-or-n-p "View the comparison diff in your browser?"))
+      ;;              (print! (item "Opened github in your browser."))
+      ;;              (browse-url diff-url)))
+      ;;
+      ;;          (if (not (or auto-accept-p
+      ;;                       (y-or-n-p "Proceed with upgrade?")))
+      ;;              (ignore (print! (error "Aborted")))
+      ;;            (print! (start "Upgrading Doom Emacs..."))
+      ;;            (print-group!
+      ;;             (doom-cli-context-put context 'straight-recipe (doom-upgrade--get-straight-recipe))
+      ;;             (or (and (zerop (car (sh! "git" "reset" "--hard" target-remote)))
+      ;;                      (equal (cdr (sh! "git" "rev-parse" "HEAD")) new-rev))
+      ;;                 (error "Failed to check out %s" (substring new-rev 0 10)))))))))
+      ;;  (ignore-errors
+      ;;    (sh! "git" "branch" "-D" target-remote)
+      ;;    (sh! "git" "remote" "remove" doom-upgrade-remote)))
+      )))
 
 (defun doom-upgrade--working-tree-dirty-p (dir)
   (cl-destructuring-bind (success . stdout)
