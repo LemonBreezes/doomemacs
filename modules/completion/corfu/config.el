@@ -53,7 +53,7 @@ TAB/S-TAB.")
         (corfu-mode +1))))
   :config
   (setq corfu-auto t
-        corfu-auto-delay 0.1
+        corfu-auto-delay 0.18
         corfu-auto-prefix 2
         global-corfu-modes '((not
                               erc-mode
