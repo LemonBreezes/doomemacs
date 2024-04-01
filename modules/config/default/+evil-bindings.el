@@ -55,7 +55,9 @@
                   #'company-indent-or-complete-common)))
            ,@(when (modulep! :completion corfu)
                '(((bound-and-true-p corfu-mode)
-                  #'indent-for-tab-command))))))
+                  (if (derived-mode-p 'eshell-mode 'comint-mode)
+                      #'completion-at-point
+                    #'indent-for-tab-command)))))))
       :m [tab]
       `(menu-item "Evil motion smart tab" nil :filter
         (lambda (cmd)
