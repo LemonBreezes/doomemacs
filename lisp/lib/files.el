@@ -487,19 +487,25 @@ If FORCE-P, overwrite the destination file if it exists, without confirmation."
 (defun doom/sudo-find-file (file)
   "Open FILE as root."
   (interactive "FOpen file as root: ")
-  (find-file (doom--sudo-file-path (expand-file-name file))))
+  ;; HACK: Disable auto-save in temporary tramp buffers because it could trigger
+  ;;   processes that hang silently in the background, making those buffers
+  ;;   inoperable for the rest of that session (Tramp caches them).
+  (let ((auto-save-default nil)
+        ;; REVIEW: use only these when we drop 28 support
+        (remote-file-name-inhibit-auto-save t)
+        (remote-file-name-inhibit-auto-save-visited t))
+    (find-file (doom--sudo-file-path (expand-file-name file)))))
 
 ;;;###autoload
 (defun doom/sudo-this-file ()
   "Open the current file as root."
   (interactive)
-  (find-file
-   (doom--sudo-file-path
-    (or (buffer-file-name (buffer-base-buffer))
-        (when (or (derived-mode-p 'dired-mode)
-                  (derived-mode-p 'wdired-mode))
-          default-directory)
-        (user-error "Cannot determine the file path of the current buffer")))))
+  (doom/sudo-find-file
+   (or (buffer-file-name (buffer-base-buffer))
+       (when (or (derived-mode-p 'dired-mode)
+                 (derived-mode-p 'wdired-mode))
+         default-directory)
+       (user-error "Cannot determine the file path of the current buffer"))))
 
 ;;;###autoload
 (defun doom/sudo-save-buffer ()
@@ -594,7 +600,12 @@ see), and if nil, defaults to `find-sibling-rules'."
                       (nconc
                        results
                        (mapcar #'expand-file-name
-                               (file-expand-wildcards expansion nil t)))))))))
+                               ;; `file-expand-wildcards' has a new REGEXP
+                               ;; argument in 29+ that is needed here. This swap
+                               ;; makes it behave as if REGEXP == t.
+                               (letf! (defun wildcard-to-regexp (wildcard)
+                                        (concat "\\`" wildcard "\\'"))
+                                 (file-expand-wildcards expansion nil))))))))))
       ;; Delete the file itself (in case it matched), and remove
       ;; duplicates, in case we have several expansions and some match
       ;; the same subsets of files.
