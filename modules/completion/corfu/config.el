@@ -40,7 +40,8 @@ TAB/S-TAB.")
               ('aggressive
                (not (or (bound-and-true-p mct--active)
                         (bound-and-true-p vertico--input)
-                        (eq (current-local-map) read-passwd-map)
+                        (and (featurep 'auth-source)
+                             (eq (current-local-map) read-passwd-map))
                         (and (featurep 'helm-core) (helm--alive-p))
                         (and (featurep 'ido) (ido-active))
                         (where-is-internal 'minibuffer-complete
