@@ -4,7 +4,6 @@
 
 Hi. This is a fork of [[https://github.com/doomemacs/doomemacs][Doom Emacs]] that has the following PRs applied:
 - [[feat(corfu): update smart tab completion by LemonBreezes · Pull Request #7739 · doomemacs/doomemacs · GitHub]]
-- [[https://github.com/doomemacs/doomemacs/pull/7439][module: lean4 mode by lenianiva · Pull Request #7439 · doomemacs/doomemacs · GitHub]]
 
 These are just PRs that I am very excited to have in Doom Emacs and am currently
 testing so consider this an unstable branch of Doom Emacs. This list will be
