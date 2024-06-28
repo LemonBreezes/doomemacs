@@ -59,6 +59,69 @@
      (end-of-line)
      ,@body))
 
+(defun +fold--union ()
+  "Get the combined region covered by all folds at point."
+  ;; We are supporting four folding systems that weren't really designed to work
+  ;; together. No doubt users will find novel, unanticipated ways to nest
+  ;; different types of folds (especially easy to do with `outline-minor-mode').
+  ;; So, we need code that can deal with any arbitrary overlap.
+  (cl-reduce
+   (lambda (&optional acc cur)
+     (when (and acc cur)
+       (cons (min (car acc) (car cur))
+             (max (cdr acc) (cdr cur)))))
+   (nconc
+    (when (+fold--vimish-fold-p)
+      (mapcar (lambda (ov)
+                (cons (overlay-start ov) (overlay-end ov)))
+              (seq-filter #'vimish-fold--vimish-overlay-p
+                          (or (overlays-at (point)) '()))))
+    (when (+fold--outline-fold-p)
+      (save-excursion
+        (let ((beg (progn (outline-back-to-heading) (point)))
+              (end (progn (outline-end-of-subtree) (point))))
+          (list (cons beg end)))))
+    (when-let ((start (+fold--hideshow-fold-p)))
+      ;; `start' could be start of the block, or 't' if that wasn't found.
+      ;; In either case, we know the fold is on the same line.
+      (let* ((start (or (and (numberp start) start)
+                        (line-beginning-position)))
+             (end (line-end-position))
+             (ov (hs-overlay-at start)))
+        (while (and (not ov) (< start end))
+          (setq start (next-overlay-change start)
+                ov (hs-overlay-at start)))
+        (when ov
+          (list (cons (overlay-start ov) (overlay-end ov))))))
+    (when (+fold--ts-fold-p)
+      (when-let* ((node (ts-fold--foldable-node-at-pos))
+                  (beg (tsc-node-start-position node))
+                  (end (tsc-node-end-position node)))
+        (list (cons beg end)))))))
+
+(defun +fold--open-rec-between (beg end)
+  "Recursively open all folds betwen BEG and END."
+  (when (featurep 'vimish-fold)
+    ;; from `vimish-fold-unfold-all'
+    (mapc #'vimish-fold--unfold
+          (vimish-fold--folds-in
+           (point-min)
+           (point-max))))
+  (and (+fold--outline-fold-p)
+       (outline-show-subtree))
+  (hs-life-goes-on
+   ;; from `hs-show-all'
+   (let ((hs-allow-nesting nil))
+     (hs-discard-overlays beg end))
+   (run-hooks 'hs-show-hook))
+  (when (bound-and-true-p ts-fold-mode)
+    ;; from `ts-fold-open-all'
+    (ts-fold--ensure-ts
+      (thread-last (overlays-in (point-min) (point-max))
+                   (seq-filter
+                    (lambda (ov)
+                      (eq (overlay-get ov 'invisible) 'ts-fold)))
+                   (mapc #'delete-overlay)))))
 
 ;;
 ;;; Commands
@@ -84,11 +147,8 @@ Targets `vimmish-fold', `hideshow', `ts-fold' and `outline' folds."
 
 Targets `vimmish-fold', `hideshow', `ts-fold' and `outline' folds."
   (interactive)
-  (save-excursion
-    (cond ((+fold--vimish-fold-p) (vimish-fold-unfold))
-          ((+fold--outline-fold-p) (outline-show-subtree))
-          ((+fold--hideshow-fold-p) (+fold-from-eol (hs-show-block)))
-          ((+fold--ts-fold-p) (ts-fold-open)))))
+  (cl-destructuring-bind (beg . end) (+fold--union)
+    (+fold--open-rec-between beg end)))
 
 ;;;###autoload
 (defun +fold/open ()
@@ -129,9 +189,9 @@ Targets `vimmish-fold', `hideshow', `ts-fold' and `outline' folds."
            (+fold--ensure-hideshow-mode)
            (if (integerp level)
                (progn
-                 (outline-hide-sublevels (max 1 (1- level)))
+                 (outline-hide-sublevels (max 1 level))
                  (hs-life-goes-on
-                  (hs-hide-level-recursive (1- level) (point-min) (point-max))))
+                  (hs-hide-level-recursive level (point-min) (point-max))))
              (hs-show-all)
              (when (fboundp 'outline-show-all)
                (outline-show-all)))))))
@@ -151,15 +211,16 @@ Targets `vimmish-fold', `hideshow', `ts-fold' and `outline' folds."
         (hs-life-goes-on
          (if (integerp level)
              (progn
-               (outline--show-headings-up-to-level (1+ level))
-               (hs-hide-level-recursive (1- level) (point-min) (point-max)))
+               (outline--show-headings-up-to-level level)
+               (hs-hide-level-recursive level (point-min) (point-max)))
            (hs-hide-all)
            (when (fboundp 'outline-hide-sublevels)
              (outline-show-only-headings))))))))
 
 ;;;###autoload
 (defun +fold/next (count)
-  "Jump to the next vimish fold, outline heading or folded region."
+  "Jump to the next vimish fold, folded outline heading or folded
+region."
   (interactive "p")
   (cl-loop with orig-pt = (point)
            for fn
@@ -169,9 +230,28 @@ Targets `vimmish-fold', `hideshow', `ts-fold' and `outline' folds."
                     (lambda ()
                       (when (featurep 'vimish-fold)
                         (if (> count 0)
-                            (evil-vimish-fold/next-fold count)
-                          (evil-vimish-fold/previous-fold (- count))))
+                            (dotimes (_ count) (vimish-fold-next-fold))
+                          (dotimes (_ count)
+                            (vimish-fold-previous-fold (- count)))))
                       (if (/= (point) orig-pt) (point)))
+                    (lambda ()
+                      (when (or (bound-and-true-p outline-minor-mode)
+                                (derived-mode-p 'outline-mode))
+                        (cl-destructuring-bind
+                            (count fn bound-fn)
+                            (if (> count 0)
+                                (list count
+                                      #'outline-next-visible-heading #'eobp)
+                              (list (- count)
+                                    #'outline-previous-visible-heading #'bobp))
+                          (dotimes (_ count)
+                            (funcall fn 1)
+                            (outline-end-of-heading)
+                            (while (and (not (funcall bound-fn))
+                                        (not (outline-invisible-p)))
+                              (funcall fn 1)
+                              (outline-end-of-heading))))
+                        (point)))
                     (lambda ()
                       ;; ts-fold does not define movement functions so we need to do it ourselves
                       (when (+fold--ts-fold-p)
