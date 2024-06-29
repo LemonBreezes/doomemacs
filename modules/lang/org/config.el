@@ -494,7 +494,7 @@ relative to `org-directory', unless it is an absolute path."
       (add-to-list 'projectile-globally-ignored-directories org-attach-id-dir)))
 
   ;; Add inline image previews for attachment links
-  (org-link-set-parameters "attachment" :image-data-fun #'+org-inline-image-data-fn))
+  (org-link-set-parameters "attachment" :image-data-fun #'+org-image-file-data-fn))
 
 
 (defun +org-init-custom-links-h ()
@@ -1153,15 +1153,12 @@ between the two."
 (use-package! org-crypt ; built-in
   :when (modulep! +crypt)
   :commands org-encrypt-entries org-encrypt-entry org-decrypt-entries org-decrypt-entry
-  :hook (org-reveal-start . org-decrypt-entry)
+  :hook (org-load . org-crypt-use-before-save-magic)
   :preface
   ;; org-crypt falls back to CRYPTKEY property then `epa-file-encrypt-to', which
   ;; is a better default than the empty string `org-crypt-key' defaults to.
   (defvar org-crypt-key nil)
-  (after! org
-    (add-to-list 'org-tags-exclude-from-inheritance "crypt")
-    (add-hook! 'org-mode-hook
-      (add-hook 'before-save-hook 'org-encrypt-entries nil t))))
+  (after! org (add-to-list 'org-tags-exclude-from-inheritance "crypt")))
 
 
 (use-package! org-clock ; built-in
@@ -1461,6 +1458,9 @@ between the two."
   ;; Don't number headings with these tags
   (setq org-num-face '(:inherit org-special-keyword :underline nil :weight bold)
         org-num-skip-tags '("noexport" "nonum"))
+
+  ;; Other org properties are all-caps. Be consistent.
+  (setq org-effort-property "EFFORT")
 
   ;; Prevent modifications made in invisible sections of an org document, as
   ;; unintended changes can easily go unseen otherwise.
