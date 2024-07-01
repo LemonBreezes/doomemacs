@@ -2,8 +2,8 @@
 #+author: StrawberryTea
 #+date: 2023-10-13
 
-Hi. This is a fork of [[https://github.com/doomemacs/doomemacs][Doom Emacs]] that has the following PRs applied:
-- [[feat(corfu): update smart tab completion by LemonBreezes · Pull Request #7739 · doomemacs/doomemacs · GitHub]]
+Hi. This is a fork of [[https://github.com/doomemacs/doomemacs][Doom Emacs]] that I sometimes use to test unmerged PRs but
+currently I am not testing any.
 
 These are just PRs that I am very excited to have in Doom Emacs and am currently
 testing so consider this an unstable branch of Doom Emacs. This list will be
