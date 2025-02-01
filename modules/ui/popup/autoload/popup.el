@@ -557,7 +557,8 @@ Accepts the same arguments as `display-buffer-in-side-window'. You must set
             ((not windows)
              (cl-letf (((symbol-function 'window--make-major-side-window-next-to)
                         (lambda (_side) (frame-root-window (selected-frame)))))
-               (when-let (window (window--make-major-side-window buffer side slot alist))
+               (when-let (window (ignore-errors
+                                   (window--make-major-side-window buffer side slot alist)))
                  (set-window-parameter window 'window-vslot vslot)
                  (add-to-list 'window-persistent-parameters '(window-vslot . writable))
                  window)))
